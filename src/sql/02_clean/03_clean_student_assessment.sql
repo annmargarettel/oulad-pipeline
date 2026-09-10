@@ -2,7 +2,7 @@
 --this csv has 173,912 rows × 5 columns
 
 
-CREATE OR REPLACE TABLE oulad.clean.studentAssessment AS
+CREATE OR REPLACE TABLE oulad.clean.student_assessment AS
 
 SELECT
 --makes sure the assessment ID is numeric
@@ -24,10 +24,10 @@ WHERE id_assessment IS NOT NULL
 
 --checking row count
 SELECT COUNT(*)
-FROM oulad.clean.studentAssessment;
+FROM oulad.clean.student_assessment;
 
 --checking data types
-DESCRIBE oulad.clean.studentAssessment;
+DESCRIBE oulad.clean.student_assessment;
 
 --checking nulls
 SELECT
@@ -37,7 +37,7 @@ SELECT
     SUM(CASE WHEN date_submitted IS NULL THEN 1 ELSE 0 END) AS null_date_submitted,
     SUM(CASE WHEN is_banked IS NULL THEN 1 ELSE 0 END) AS null_is_banked,
     SUM(CASE WHEN score IS NULL THEN 1 ELSE 0 END) AS null_score
-FROM oulad.clean.studentAssessment;
+FROM oulad.clean.student_assessment;
 
 
 --DQ RESULTS TABLE
@@ -61,7 +61,7 @@ SELECT
     'DQ01' AS check_id,
     'Student ID Not Null' AS check_name,
     'Silver' AS layer,
-    'studentAssessment' AS table_name,
+    'student_assessment' AS table_name,
 
     CASE
         WHEN COUNT(*) = 0 THEN 'PASS'
@@ -72,7 +72,7 @@ SELECT
 
     current_timestamp() AS check_timestamp
 
-FROM oulad.clean.studentAssessment
+FROM oulad.clean.student_assessment
 WHERE id_student IS NULL;
 
 --DQ02 — Assessment ID cannot be NULL
@@ -82,7 +82,7 @@ SELECT
     'DQ02' AS check_id,
     'Assessment ID Not Null' AS check_name,
     'Silver' AS layer,
-    'studentAssessment' AS table_name,
+    'student_assessment' AS table_name,
 
     CASE
         WHEN COUNT(*) = 0 THEN 'PASS'
@@ -93,7 +93,7 @@ SELECT
 
     current_timestamp() AS check_timestamp
 
-FROM oulad.clean.studentAssessment
+FROM oulad.clean.student_assessment
 WHERE id_assessment IS NULL;
 
 --DQ03 — Student + Assessment must be unique
@@ -103,7 +103,7 @@ SELECT
     'DQ03' AS check_id,
     'Student Assessment Grain Unique' AS check_name,
     'Silver' AS layer,
-    'studentAssessment' AS table_name,
+    'student_assessment' AS table_name,
 
     CASE
         WHEN COUNT(*) = 0 THEN 'PASS'
@@ -118,7 +118,7 @@ FROM (
     SELECT
         id_student,
         id_assessment
-    FROM oulad.clean.studentAssessment
+    FROM oulad.clean.student_assessment
     GROUP BY
         id_student,
         id_assessment
@@ -132,7 +132,7 @@ SELECT
     'DQ04' AS check_id,
     'Score Within Valid Range' AS check_name,
     'Silver' AS layer,
-    'studentAssessment' AS table_name,
+    'student_assessment' AS table_name,
 
     CASE
         WHEN COUNT(*) = 0 THEN 'PASS'
@@ -143,7 +143,7 @@ SELECT
 
     current_timestamp() AS check_timestamp
 
-FROM oulad.clean.studentAssessment
+FROM oulad.clean.student_assessment
 WHERE score IS NOT NULL
   AND (score < 0 OR score > 100);
 
@@ -154,7 +154,7 @@ SELECT
     'DQ05' AS check_id,
     'is_banked Valid Values' AS check_name,
     'Silver' AS layer,
-    'studentAssessment' AS table_name,
+    'student_assessment' AS table_name,
 
     CASE
         WHEN COUNT(*) = 0 THEN 'PASS'
@@ -165,12 +165,12 @@ SELECT
 
     current_timestamp() AS check_timestamp
 
-FROM oulad.clean.studentAssessment
+FROM oulad.clean.student_assessment
 WHERE is_banked IS NULL
    OR is_banked NOT IN (0, 1);
 
 --View the results
 SELECT *
 FROM oulad.clean.dq_check_results
-WHERE table_name = 'studentAssessment'
+WHERE table_name = 'student_assessment'
 ORDER BY check_id;
