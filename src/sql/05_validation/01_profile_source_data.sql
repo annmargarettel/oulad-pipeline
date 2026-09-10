@@ -276,7 +276,7 @@ SELECT
     COUNT(*) AS total_rows,
     COUNT(*) - COUNT(id_student) AS null_count,
     ROUND(
-        100 * (COUNT(*) - COUNT(id_student)/COUNT(*)),2
+        100 * (COUNT(*) - COUNT(id_student))/COUNT(*),2
     ) AS null_percentage,
     COUNT(DISTINCT id_student) AS distinct_count,
     ROUND(
