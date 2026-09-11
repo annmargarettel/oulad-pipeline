@@ -1,19 +1,23 @@
--- ----------------------------------------------------------
--- FACT: FactVLEInteractions
--- ----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS fact_vle_interactions (
-    id_student          INT NOT NULL,
-    code_module         STRING NOT NULL,
-    code_presentation   STRING NOT NULL,
-    date                INT NOT NULL,
-    id_site             INT NOT NULL,
-    activity_type       STRING,
-    sum_click           INT,
-    CONSTRAINT pk_factvle PRIMARY KEY (id_student, code_module, code_presentation, date, id_site),
-    CONSTRAINT fk_factvle_student FOREIGN KEY (id_student)
-        REFERENCES dim_student (id_student),
-    CONSTRAINT fk_factvle_modpres FOREIGN KEY (code_module, code_presentation)
-        REFERENCES dim_module_presentation (code_module, code_presentation),
-    CONSTRAINT fk_factvle_date FOREIGN KEY (date)
-        REFERENCES DimDate (date)
-) USING DELTA;
+CREATE OR REPLACE TABLE oulad.mart.fact_vle_interactions AS
+SELECT 
+    sv.id_student,
+    sv.code_module,
+    sv.code_presentation,
+    sv.date,
+    sv.id_site,
+    v.activity_type,
+    sv.sum_click
+FROM oulad.clean.student_vle AS sv
+-- Join with VLE metadata to enrich interactions with activity_type
+LEFT JOIN oulad.clean.vle AS v
+    ON sv.id_site = v.id_site
+   AND sv.code_module = v.code_module
+   AND sv.code_presentation = v.code_presentation
+-- Enforce referential integrity against existing dimension tables
+INNER JOIN oulad.mart.dim_student AS ds
+    ON sv.id_student = ds.id_student
+INNER JOIN oulad.mart.dim_module_presentation AS dmp
+    ON sv.code_module = dmp.code_module
+   AND sv.code_presentation = dmp.code_presentation
+INNER JOIN oulad.mart.dim_date AS dd
+    ON sv.date = dd.date;

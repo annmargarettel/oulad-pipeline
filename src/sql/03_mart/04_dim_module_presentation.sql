@@ -1,11 +1,9 @@
--- ----------------------------------------------------------
--- DIM: DimModulePresentation (grain: module + presentation)
--- ----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS dim_module_presentation (
-    code_module              STRING NOT NULL,
-    code_presentation        STRING NOT NULL,
-    module_presentation_length INT,
-    CONSTRAINT pk_dimmodpres PRIMARY KEY (code_module, code_presentation),
-    CONSTRAINT fk_dimmodpres_course FOREIGN KEY (code_module)
-        REFERENCES dim_course (code_module)
-) USING DELTA;
+CREATE OR REPLACE TABLE oulad.mart.dim_module_presentation AS
+SELECT DISTINCT
+    c.code_module,
+    dc.code_module AS code_presentation_module, -- validates reference to dim_course
+    c.code_presentation,
+    c.module_presentation_length
+FROM oulad.clean.courses AS c
+INNER JOIN oulad.mart.dim_course AS dc
+    ON c.code_module = dc.code_module;

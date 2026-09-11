@@ -1,23 +1,24 @@
--- ----------------------------------------------------------
--- FACT: FactAssessments
--- ----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS fact_assessments (
-    id_student          INT NOT NULL,
-    code_module         STRING NOT NULL,
-    code_presentation   STRING NOT NULL,
-    date                INT NOT NULL,
-    id_assessment       INT NOT NULL,
-    assessment_type     STRING,
-    weight              DECIMAL(5,2),
-    score               DECIMAL(5,2),
-    date_submitted      INT,
-    submission_delay    INT,
-    is_banked           BOOLEAN,
-    CONSTRAINT pk_factassess PRIMARY KEY (id_student, code_module, code_presentation, date, id_assessment),
-    CONSTRAINT fk_factassess_student FOREIGN KEY (id_student)
-        REFERENCES dim_student (id_student),
-    CONSTRAINT fk_factassess_modpres FOREIGN KEY (code_module, code_presentation)
-        REFERENCES dim_module_presentation (code_module, code_presentation),
-    CONSTRAINT fk_factassess_date FOREIGN KEY (date)
-        REFERENCES DimDate (date)
-) USING DELTA;
+CREATE OR REPLACE TABLE oulad.mart.fact_assessments AS
+SELECT 
+    sa.id_student,
+    a.code_module,
+    a.code_presentation,
+    a.date,
+    sa.id_assessment,
+    a.assessment_type,
+    CAST(a.weight AS DECIMAL(5,2)) AS weight,
+    CAST(sa.score AS DECIMAL(5,2)) AS score,
+    sa.date_submitted,
+    (sa.date_submitted - a.date) AS submission_delay,
+    CAST(sa.is_banked AS BOOLEAN) AS is_banked
+FROM oulad.clean.student_assessment AS sa
+INNER JOIN oulad.clean.assessments AS a
+    ON sa.id_assessment = a.id_assessment
+-- Enforce referential integrity against dimension tables
+INNER JOIN oulad.mart.dim_student AS ds
+    ON sa.id_student = ds.id_student
+INNER JOIN oulad.mart.dim_module_presentation AS dmp
+    ON a.code_module = dmp.code_module
+   AND a.code_presentation = dmp.code_presentation
+INNER JOIN oulad.mart.dim_date AS dd
+    ON a.date = dd.date;

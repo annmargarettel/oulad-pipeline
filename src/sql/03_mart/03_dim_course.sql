@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS dim_course (
-    code_module STRING NOT NULL,
-    CONSTRAINT pk_dimcourse PRIMARY KEY (code_module)
-) USING DELTA;
+CREATE OR REPLACE TABLE oulad.mart.dim_course AS
+SELECT DISTINCT
+    code_module
+FROM oulad.clean.courses;
