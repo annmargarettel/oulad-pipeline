@@ -1,6 +1,6 @@
 -- DIM: DimStudent (grain: student)
 -- ----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS DimStudent (
+CREATE TABLE IF NOT EXISTS oulad.mart.DimStudent (
     id_student          INT NOT NULL,
     final_result        STRING,
     date_registration   INT,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS DimStudent (
 -- Grain: one row per student
 -- Combines student_info and student_registration
 -- ----------------------------------------------------------
-INSERT OVERWRITE DimStudent
+INSERT OVERWRITE oulad.mart.DimStudent
 SELECT DISTINCT
     si.id_student,
     si.final_result,
@@ -27,13 +27,4 @@ LEFT JOIN oulad.clean.student_registration sr
     AND si.code_presentation = sr.code_presentation
 WHERE si.id_student IS NOT NULL;
 
--- ----------------------------------------------------------
--- DIM: DimModulePresentation
--- Grain: one row per module + presentation combination
--- ----------------------------------------------------------
-INSERT OVERWRITE DimModulePresentation
-SELECT DISTINCT
-    code_module,
-    code_presentation,
-    module_presentation_length
-FROM oulad.clean.courses;
+

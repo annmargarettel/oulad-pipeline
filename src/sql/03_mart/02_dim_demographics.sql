@@ -1,6 +1,6 @@
 -- DIM: DimDemographics (grain: student + module + presentation)
 -- ----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS DimDemographics (
+CREATE TABLE IF NOT EXISTS oulad.mart.DimDemographics (
     id_student              INT NOT NULL,
     code_module             STRING NOT NULL,
     code_presentation       STRING NOT NULL,
@@ -16,14 +16,14 @@ CREATE TABLE IF NOT EXISTS DimDemographics (
     CONSTRAINT fk_dimdemo_student FOREIGN KEY (id_student)
         REFERENCES DimStudent (id_student),
     CONSTRAINT fk_dimdemo_modpres FOREIGN KEY (code_module, code_presentation)
-        REFERENCES DimModulePresentation (code_module, code_presentation)
+        REFERENCES oulad.mart.DimModulePresentation (code_module, code_presentation)
 ) USING DELTA;
 
 
 -- DIM: DimDemographics
 -- Grain: one row per student per module presentation
 -- ----------------------------------------------------------
-INSERT OVERWRITE DimDemographics
+INSERT OVERWRITE oulad.mart.DimDemographics
 SELECT
     id_student,
     code_module,

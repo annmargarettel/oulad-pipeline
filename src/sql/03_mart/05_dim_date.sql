@@ -1,6 +1,6 @@
 -- DIM: DimDate (grain: calendar date)
 -- ----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS DimDate (
+CREATE TABLE IF NOT EXISTS oulad.mart.DimDate (
     date            INT NOT NULL,
     relative_week   INT,
     course_phase    STRING,
@@ -11,11 +11,11 @@ CREATE TABLE IF NOT EXISTS DimDate (
 -- Grain: one row per unique date
 -- Generate from all date columns across tables
 -- ----------------------------------------------------------
-INSERT OVERWRITE DimDate
+INSERT OVERWRITE oulad.mart.DimDate
 WITH all_dates AS (
     -- Dates from assessments
     SELECT DISTINCT date AS date_value
-    FROM oulad.clean.01_clean_assessments
+    FROM oulad.clean.clean_assessments
     WHERE date IS NOT NULL
     
     UNION
@@ -43,7 +43,7 @@ WITH all_dates AS (
     
     -- Submission dates
     SELECT DISTINCT date_submitted AS date_value
-    FROM oulad.clean.student_assessment
+    FROM oulad.clean.clean_student_assessment
     WHERE date_submitted IS NOT NULL
 )
 SELECT

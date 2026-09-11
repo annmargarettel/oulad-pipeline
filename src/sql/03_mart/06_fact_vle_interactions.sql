@@ -1,6 +1,6 @@
 -- FACT: FactVLEInteractions
 -- ----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS FactVLEInteractions (
+CREATE TABLE IF NOT EXISTS oulad.mart.FactVLEInteractions (
     id_student          INT NOT NULL,
     code_module         STRING NOT NULL,
     code_presentation   STRING NOT NULL,
@@ -10,14 +10,14 @@ CREATE TABLE IF NOT EXISTS FactVLEInteractions (
     sum_click           INT,
     CONSTRAINT pk_factvle PRIMARY KEY (id_student, code_module, code_presentation, date, id_site),
     CONSTRAINT fk_factvle_student FOREIGN KEY (id_student)
-        REFERENCES DimStudent (id_student),
+        REFERENCES oulad.mart.DimStudent (id_student),
     CONSTRAINT fk_factvle_modpres FOREIGN KEY (code_module, code_presentation)
-        REFERENCES DimModulePresentation (code_module, code_presentation),
+        REFERENCES oulad.mart.DimModulePresentation (code_module, code_presentation),
     CONSTRAINT fk_factvle_date FOREIGN KEY (date)
-        REFERENCES DimDate (date)
+        REFERENCES oulad.mart.DimDate (date)
 ) USING DELTA;
 
-INSERT OVERWRITE FactVLEInteractions
+INSERT OVERWRITE oulad.mart.FactVLEInteractions
 SELECT
     sv.id_student,
     sv.code_module,

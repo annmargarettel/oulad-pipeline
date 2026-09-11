@@ -1,6 +1,6 @@
 -- FACT: FactAssessments
 -- ----------------------------------------------------------
-CREATE TABLE IF NOT EXISTS FactAssessments (
+CREATE TABLE IF NOT EXISTS oulad.mart.FactAssessments (
     id_student          INT NOT NULL,
     code_module         STRING NOT NULL,
     code_presentation   STRING NOT NULL,
@@ -14,15 +14,15 @@ CREATE TABLE IF NOT EXISTS FactAssessments (
     is_banked           BOOLEAN,
     CONSTRAINT pk_factassess PRIMARY KEY (id_student, code_module, code_presentation, date, id_assessment),
     CONSTRAINT fk_factassess_student FOREIGN KEY (id_student)
-        REFERENCES DimStudent (id_student),
+        REFERENCES oulad.mart.DimStudent (id_student),
     CONSTRAINT fk_factassess_modpres FOREIGN KEY (code_module, code_presentation)
-        REFERENCES DimModulePresentation (code_module, code_presentation),
+        REFERENCES oulad.mart.DimModulePresentation (code_module, code_presentation),
     CONSTRAINT fk_factassess_date FOREIGN KEY (date)
-        REFERENCES DimDate (date)
+        REFERENCES oulad.mart.DimDate (date)
 ) USING DELTA;
 
 -- ----------------------------------------------------------
-INSERT OVERWRITE FactAssessments
+INSERT OVERWRITE oulad.mart.FactAssessments
 SELECT
     sa.id_student,
     a.code_module,
@@ -35,8 +35,8 @@ SELECT
     sa.date_submitted,
     (sa.date_submitted - a.date) AS submission_delay,
     CAST(sa.is_banked AS BOOLEAN) AS is_banked
-FROM oulad.clean.student_assessment sa
-INNER JOIN oulad.clean.01_clean_assessments a
+FROM oulad.clean.clean_student_assessment sa
+INNER JOIN oulad.clean.clean_assessments a
     ON sa.id_assessment = a.id_assessment
 WHERE sa.id_student IS NOT NULL
   AND sa.id_assessment IS NOT NULL
