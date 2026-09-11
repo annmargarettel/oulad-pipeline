@@ -1,141 +1,113 @@
--- CLEAN studentInfo
--- Grain: one row is one student in one module presentation.
--- 32,593 rows in, 32,593 rows out. Nothing is deleted, problems are flagged.
+-- Clean student_info
+-- Grain: one row is one student in one module presentation
+-- Expected row count: 32,593 rows in, 32,593 out (no change)
+--
+-- CLEANING ONLY. No DQ checks, no dq_flags, no dq_status in this file.
+-- The 25 data quality checks for this table are handed off separately and write
+-- into oulad.validation.staging with table_name = 'student_info'.
 --
 -- What this file does
---   1. Trims and normalises every column, and casts with TRY_CAST so a bad value
---      becomes a NULL we can flag rather than an error that kills the load.
---   2. Turns the literal string '?' in imd_band into a real NULL. The source encodes
---      "not known" that way, so a plain null check on this file returns zero and
---      hides 1,111 missing values.
---   3. Normalises the one band written '10-20' while the other nine carry a '%'.
---      The original is kept in imd_band_raw so the change is auditable.
---   4. Adds imd_decile_low so the bands sort correctly on a dashboard, and
---      credit_load_band so the strongest withdrawal signal is one column.
---   5. Gives every row a dq_status and a readable dq_flags array.
---      The mart can filter with: WHERE dq_status <> 'REJECT'
+-- 1. Trims and standardises casing on every string column.
+-- 2. Casts with TRY_CAST, never bare CAST, so a bad value becomes a NULL the
+--    validations can count rather than an error that kills the load.
+-- 3. imd_band: the source writes "not known" as the literal string '?'. That is a
+--    present value, so a plain null check on this file returns zero and hides
+--    1,111 rows. '?' becomes a real NULL here.
+-- 4. imd_band: one band is written '10-20' with no percent sign, 3,516 rows, while
+--    the other nine carry a '%'. Normalised to '10-20%' so the ten bands sort and
+--    join as one series. The untouched value stays in imd_band_raw, so this is the
+--    only value in the table that is changed rather than left alone, and the change
+--    is auditable.
+-- 5. Adds the derived columns the mart and the validations read. These are
+--    cleaning-layer conveniences, not DQ results: enrolment_key, imd_band_raw,
+--    imd_band_is_missing, imd_decile_low, age_bands_seen_for_student,
+--    credit_load_band, is_withdrawn.
+--    Three of them are inputs to the staging validations, so dropping them breaks
+--    those checks: imd_band_raw (label format), enrolment_key (surrogate key
+--    uniqueness), age_bands_seen_for_student (age_band stable per student).
+-- 6. Deletes nothing. Rows in equals rows out.
+--
+-- Reads:  oulad.raw.student_info
+-- Writes: oulad.clean.student_info
 
 CREATE OR REPLACE TABLE oulad.clean.student_info
-COMMENT 'One row per student enrolment in one module presentation. Cleaned, typed, DQ-flagged.'
+COMMENT 'One row per student enrolment in one module presentation. Cleaned and typed.'
 AS
 WITH typed AS (
   SELECT
-    -- the composite primary key
-    UPPER(TRIM(code_module))                              AS code_module,
-    UPPER(TRIM(code_presentation))                        AS code_presentation,
-    id_student                                            AS id_student,
+    -- composite business key
+    UPPER(TRIM(code_module))                       AS code_module,
+    UPPER(TRIM(code_presentation))                 AS code_presentation,
+    TRY_CAST(TRIM(CAST(id_student AS STRING)) AS INT) AS id_student,
 
     -- demographics
-    UPPER(TRIM(gender))                                   AS gender,
-    NULLIF(TRIM(region), '')                              AS region,
-    NULLIF(TRIM(highest_education), '')                   AS highest_education,
+    UPPER(TRIM(gender))                            AS gender,
+    NULLIF(TRIM(region), '')                       AS region,
+    NULLIF(TRIM(highest_education), '')            AS highest_education,
 
     -- imd_band, the column that needed the most work.
-    -- The source encodes "not known" as the literal string '?', and writes one
-    -- band as '10-20' while the other nine carry a '%'.
+    -- '?' is the source's "not known". '10-20' is the one band missing its '%'.
     CASE
-      WHEN TRIM(imd_band) IN ('?', '')             THEN NULL
-      WHEN TRIM(imd_band) RLIKE '^[0-9]+-[0-9]+$'  THEN CONCAT(TRIM(imd_band), '%')
+      WHEN TRIM(imd_band) IN ('?', '')                 THEN NULL
+      WHEN TRIM(imd_band) RLIKE '^[0-9]+-[0-9]+$'      THEN CONCAT(TRIM(imd_band), '%')
       ELSE TRIM(imd_band)
-    END                                                   AS imd_band,
-    TRIM(imd_band)                                        AS imd_band_raw,
+    END                                            AS imd_band,
+    TRIM(imd_band)                                 AS imd_band_raw,
 
-    NULLIF(TRIM(age_band), '')                            AS age_band,
-    num_of_prev_attempts                                  AS num_of_prev_attempts,
-    studied_credits                                       AS studied_credits,
-    UPPER(TRIM(disability))                               AS disability,
-    NULLIF(TRIM(final_result), '')                        AS final_result
+    NULLIF(TRIM(age_band), '')                     AS age_band,
+    TRY_CAST(TRIM(CAST(num_of_prev_attempts AS STRING)) AS INT) AS num_of_prev_attempts,
+    TRY_CAST(TRIM(CAST(studied_credits AS STRING)) AS INT)      AS studied_credits,
+    UPPER(TRIM(disability))                        AS disability,
+    NULLIF(TRIM(final_result), '')                 AS final_result
   FROM oulad.raw.student_info
 ),
 
 -- One student can sit several presentations. This counts how many different
--- age_bands the source gives the same student, which is what breaks dim_student.
+-- age_bands the source gives the same student. 72 students have two, because they
+-- crossed into the next bracket between courses. dim_student has to collapse with
+-- ROW_NUMBER rather than SELECT DISTINCT or every fact row for those 72 joins twice.
 student_age AS (
   SELECT id_student, COUNT(DISTINCT age_band) AS age_bands_seen_for_student
   FROM typed
   GROUP BY id_student
-),
-
-derived AS (
-  SELECT
-    t.*,
-    sa.age_bands_seen_for_student,
-    MD5(CONCAT_WS('|', t.code_module, t.code_presentation, CAST(t.id_student AS STRING))) AS enrolment_key,
-    (t.imd_band IS NULL)                                          AS imd_band_is_missing,
-    TRY_CAST(SPLIT(t.imd_band, '-')[0] AS INT)                    AS imd_decile_low,
-    CASE
-      WHEN t.studied_credits > 240 THEN 'over 240 (flagged outlier)'
-      WHEN t.studied_credits > 120 THEN '121-240'
-      WHEN t.studied_credits > 60  THEN '61-120'
-      ELSE                              '60 or less'
-    END                                                           AS credit_load_band,
-    (t.final_result = 'Withdrawn')                                AS is_withdrawn
-  FROM typed t
-  LEFT JOIN student_age sa ON sa.id_student = t.id_student
-),
-
-flagged AS (
-  SELECT
-    d.*,
-    ARRAY_COMPACT(ARRAY(
-      CASE WHEN d.imd_band_is_missing
-           THEN 'WARN: imd_band not known, source wrote ?' END,
-      CASE WHEN d.imd_band_raw RLIKE '^[0-9]+-[0-9]+$'
-           THEN 'WARN: imd_band label normalised, source was missing the % sign' END,
-      CASE WHEN d.num_of_prev_attempts > 2
-           THEN 'WARN: more than two previous attempts' END,
-      CASE WHEN d.age_bands_seen_for_student > 1
-           THEN 'WARN: age_band differs across this students presentations' END,
-      CASE WHEN d.studied_credits > 240
-           THEN 'WARN: studied_credits above the 99th percentile' END,
-      CASE WHEN d.id_student IS NULL
-           THEN 'REJECT: id_student is null' END,
-      CASE WHEN d.final_result IS NULL
-             OR d.final_result NOT IN ('Pass', 'Fail', 'Withdrawn', 'Distinction')
-           THEN 'REJECT: final_result is not a known outcome' END
-    )) AS dq_flags
-  FROM derived d
 )
 
 SELECT
-  enrolment_key,
-  code_module,
-  code_presentation,
-  id_student,
-  gender,
-  region,
-  highest_education,
-  imd_band,
-  imd_band_raw,
-  imd_band_is_missing,
-  imd_decile_low,
-  age_band,
-  age_bands_seen_for_student,
-  num_of_prev_attempts,
-  studied_credits,
-  credit_load_band,
-  disability,
-  final_result,
-  is_withdrawn,
-  dq_flags,
-  CASE
-    WHEN EXISTS(dq_flags, f -> f LIKE 'REJECT:%') THEN 'REJECT'
-    WHEN SIZE(dq_flags) > 0                       THEN 'WARN'
-    ELSE                                               'PASS'
-  END AS dq_status,
-  current_timestamp() AS _cleaned_at
-FROM flagged;
+  -- surrogate key over the composite business key, so a downstream table can
+  -- reference one column instead of three
+  MD5(CONCAT_WS('|', t.code_module, t.code_presentation,
+                CAST(t.id_student AS STRING)))     AS enrolment_key,
 
--- Verification. All four should come back clean before the mart reads this table.
---   1. Row count matches raw:        32,593 = 32,593
---   2. Composite key is unique:      0 duplicates
---   3. Nothing rejected:             0 rows
---   4. Missing imd_band is flagged, not dropped: 1,111 rows still present
-SELECT
-  (SELECT COUNT(*) FROM oulad.raw.student_info)                          AS raw_rows,
-  COUNT(*)                                                              AS clean_rows,
-  COUNT(*) - COUNT(DISTINCT code_module, code_presentation, id_student)  AS duplicate_keys,
-  COUNT_IF(dq_status = 'REJECT')                                        AS rejected,
-  COUNT_IF(dq_status = 'WARN')                                          AS flagged,
-  COUNT_IF(imd_band_is_missing)                                         AS imd_band_not_known
-FROM oulad.clean.student_info;
+  -- composite business key
+  t.code_module,
+  t.code_presentation,
+  t.id_student,
+
+  -- the twelve source columns, cleaned and typed
+  t.gender,
+  t.region,
+  t.highest_education,
+  t.imd_band,
+  t.imd_band_raw,
+  t.age_band,
+  t.num_of_prev_attempts,
+  t.studied_credits,
+  t.disability,
+  t.final_result,
+
+  -- derived, so a dashboard tile or a validation does not re-derive them
+  (t.imd_band IS NULL)                             AS imd_band_is_missing,
+  TRY_CAST(SPLIT(t.imd_band, '-')[0] AS INT)       AS imd_decile_low,
+  sa.age_bands_seen_for_student,
+  CASE
+    WHEN t.studied_credits > 240 THEN 'over 240 (flagged outlier)'
+    WHEN t.studied_credits > 120 THEN '121-240'
+    WHEN t.studied_credits >  60 THEN '61-120'
+    ELSE '60 or less'
+  END                                              AS credit_load_band,
+  (t.final_result = 'Withdrawn')                   AS is_withdrawn,
+
+  current_timestamp()                              AS _cleaned_at
+FROM typed t
+LEFT JOIN student_age sa
+  ON sa.id_student = t.id_student;
