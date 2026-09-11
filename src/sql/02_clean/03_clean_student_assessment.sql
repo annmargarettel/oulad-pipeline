@@ -1,9 +1,9 @@
 -- ============================================================
 -- SILVER / CLEAN LAYER
--- student_assessment
+-- clean_student_assessment
 -- ============================================================
 
-CREATE OR REPLACE TABLE oulad.clean.student_assessment AS
+CREATE OR REPLACE TABLE oulad.clean.clean_student_assessment AS
 
 SELECT
 
@@ -24,5 +24,4 @@ SELECT
 
 FROM oulad.raw.student_assessment;
 
-SELECT *
-FROM oulad.clean.student_assessment;
+DROP TABLE IF EXISTS oulad.clean.student_assessment;
